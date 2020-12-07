@@ -1,6 +1,13 @@
 Annotation pipeline for structural variants found in long reads (e.g. ONT). 
 Uses public SV catalogs, repeat, gene, regulatory tracks to annotate and explore the SVs in an HTML report (and paired TSV file).
 
+## Docker container
+
+`quay.io/jmonlong/nicu`, see [quay.io page](https://quay.io/repository/jmonlong/svnicu)
+
+For now, I build and push the container [manually](buil_docker.sh). 
+Once I've put the necessary annotation files somewhere (or made them inputs), it will be automatically built.
+
 ## Running the pipeline
 
 Within the associated Docker container (see [Dockerfile](Dockerfile)):
