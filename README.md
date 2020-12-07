@@ -1,6 +1,17 @@
 Annotation pipeline for structural variants found in long reads (e.g. ONT). 
 Uses public SV catalogs, repeat, gene, regulatory tracks to annotate and explore the SVs in an HTML report (and paired TSV file).
 
+Jump to:
+- [Docker container](#docker-container)
+- [Running the pipeline](#running-the-pipeline)
+- [Inputs](#inputs)
+- [Outputs](#outputs)
+    - [Column names](#column-names)
+    - [TSV file](#tsv-file)
+- [Methods](#methods)
+    - [Tiers definition](#tiers)
+- [Recommendations for interpretation](#recommendations-for-interpretation)
+
 ## Docker container
 
 `quay.io/jmonlong/nicu`, see [quay.io page](https://quay.io/repository/jmonlong/svnicu)
@@ -109,3 +120,13 @@ In most tables, we removed common variants, i.e. either:
 
 The known SV and other annotation tracks are prepared into one file using [prepare-sv-report-data.R](prepare-sv-report-data.R). 
 Note that this script requires SV calls on our 11 control genomes, not yet available in this repo.
+
+## Recommendations for interpretation
+
+- Large CNVs: use the `cov` column as an orthogonal support. If coverage around 1, it's likely a false positive.
+- `_asm` in the SV id (`svid` column) means the allele could be re-assembled from raw reads. It's a good sign.
+- `qual` column can be used as confidence, the higher the better.
+- Take the genotype information (`ac` column for allele count) with a grain of salt.
+- Using the HTML report
+    - Click on the links to jump to UCSC Genome Browser (`coord` column) or gnomAD (`pLI` column) and other gene information (`gene` column).
+    - Remove (FP?) large CNVs from the tables using the `large` column. 
