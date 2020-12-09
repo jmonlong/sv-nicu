@@ -28,7 +28,7 @@ giab$ac = 1
 
 message('In-house nanopore samples')
 vcfs = list.files('.', '.sniffles.vcf.gz')
-vcfs = setdiff(vcfs, paste0(c('HG002', 'HG003', 'HG004'), '.sniffles.vcf.gz')) ## Temporary to test
+## vcfs = setdiff(vcfs, paste0(c('HG002', 'HG003', 'HG004'), '.sniffles.vcf.gz')) ## Temporary to test
 hpgp = lapply(vcfs, function(vcff){
   svs = readSVvcf(vcff, qual.field='RE')
   svs$sample = gsub('.sniffles.vcf.gz', '', vcff)
@@ -37,7 +37,7 @@ hpgp = lapply(vcfs, function(vcff){
 hpgp = do.call(c, hpgp)
 hpgp = subset(hpgp, ac>0 & seqnames(hpgp) %in% c(1:22,'X','Y','MT'))
 hpgp$ac = 1
-hpgp$qual = hpgp$sample = hpgp$ref = hpgp$alt = NULL
+hpgp$qual = hpgp$ref = hpgp$alt = NULL
 
 message('Gene annotation...')
 if(!file.exists('gencode.v35lift37.annotation.gtf.gz')){
@@ -152,4 +152,4 @@ cyto.gr = makeGRangesFromDataFrame(cyto.df, keep.extra.columns=TRUE)
 
 message('Save in RData file...')
 save(genc, types.ranked, types.labels, clinsv, gnomad, giab, hpgp, gene.list,
-     sr, dgv.loss, dgv.gain, ctcf, cres, cons.gr, pli.df, cyto.gr, file='sv-report-db.RData')
+     sr, dgv.loss, dgv.gain, ctcf, cres, cons.gr, pli.df, cyto.gr, file='sv_annotation_database.RData')

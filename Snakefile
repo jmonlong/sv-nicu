@@ -1,14 +1,12 @@
 ## config
 ## inputs:
-## - 'vcf' VCF from Sniffles
+## - 'vcf' VCF from Sniffles OR `vcf_list` text file with list of VCFs to concatenate
 ## - 'bam' BAM header
 ## - 'bai' BAM index
+## - 'ref' reference FASTA
 ## output
 ## - 'html' HTML report
 ## - 'tsv' TSV file
-if 'vcf' not in config or 'bai' not in config:
-    print("inputs must include 'vcf' and 'bai'")
-    exit
 if 'html' not in config:
     config['html'] = 'sv-report.html'
 if 'tsv' not in config:
@@ -16,6 +14,24 @@ if 'tsv' not in config:
 if 'karyo_tsv' not in config:
     config['karyo_tsv'] = 'chr-arm-karyotype.tsv'
 
+## sample name
+SAMPLE = 'FAST0X'
+if 'sample' in config:
+    SAMPLE = config['sample']
+
+## input VCF or VCF list
+VCF = ''
+VCFS = []
+if 'vcf' in config:
+    VCF = config['vcf']
+if VCF == '' and 'vcf_list' in config:
+    inf = open(config['vcf_list'], 'r')
+    for line in inf:
+        VCFS.append(line.rstrip().rstrip('.vcf'))
+    inf.close()
+    VCF = SAMPLE + '.sniffles.merged.vcf'
+
+## additional gene list?
 GENE_LIST = 'NA'
 if 'gene_list' in config:
     GENE_LIST = config['gene_list']
@@ -54,10 +70,25 @@ rule make_report:
         Rscript -e 'rmarkdown::render("report.Rmd", output_file="{output.html}")' {input.vcf_t1}  {input.vcf_t1_ft}  {input.vcf_other}  {input.idxcov}  {input.sv_db} {GENE_LIST} {output.tsv} {output.karyo}
         """
 
+rule rehead_vcf:
+    input: '{vcf}.vcf'
+    output: '{vcf}.rn.vcf'
+    params: temp='{vcf}.temp.txt'
+    shell:
+        """
+        echo {SAMPLE} > {params.temp}
+        bcftools reheader -s {params.temp} {input} > {output}
+        """
+
+rule merge_vcfs:
+    input: expand('{vcf}.rn.vcf', vcf=VCFS)
+    output: VCF
+    shell: "bcftools concat {input} > {output}"
+
 ## extract tier 1 SVs to be finetuned or visualized
 rule extract_tiers:
     input:
-        vcf=config['vcf'],
+        vcf=VCF,
         sv_db=config['db']
     output: 
         vcf_t1='svs_tier1.tsv',

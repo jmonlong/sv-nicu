@@ -120,8 +120,8 @@ if(length(ol)>0){
   svs.t1$svid = paste0(svs.t1$svid, '_amb')
 }
 
-svs = rbind(svs.t1 %>% select(seqnames, start, end, svid, type, size, qual, freq, ac),
-            svs.o %>% select(seqnames, start, end, svid, type, size, qual, freq, ac))
+svs = rbind(svs.t1 %>% select(seqnames, start, end, svid, type, size, qual, freq, hpgp, ac),
+            svs.o %>% select(seqnames, start, end, svid, type, size, qual, freq, hpgp, ac))
 svs.gr = makeGRangesFromDataFrame(svs, keep.extra.columns=TRUE)
 svs.gr$large = svs.gr$size > 1e5
 
@@ -296,15 +296,15 @@ Recommended: filter out large SVs using column `large`.
 
 ```{r table_high_coding_gene}
 svs.gene %>% as.data.frame %>% mutate(chr=seqnames, pos=start) %>%
-  filter(gene_type=='protein_coding', freq<.01, impact=='coding') %>%
+  filter(gene_type=='protein_coding', impact=='coding') %>%
   merge(pli.df, all.x=TRUE) %>%
   mutate(pLI=ifelse(is.na(pLI), -1, pLI)) %>% 
   merge(genes.list.s, all.x=TRUE) %>% 
   select(gene_list, gene, pLI,
-         pos, svid, type, size, large, qual, ac, freq,
+         pos, svid, type, size, large, qual, ac, freq, hpgp,
          simp.rep, dgv, cons, cres,
          chr, end) %>%
-  arrange(is.na(gene_list), large, desc(pLI), freq, desc(size)) %>%
+  arrange(is.na(gene_list), large, desc(pLI), freq, hpgp, desc(size)) %>%
   formatTable() %>%
   datatable(filter='top', escape=FALSE, options=list(pageLength=25))
 ```
@@ -321,15 +321,15 @@ Recommended: filter out large SVs using column `large`.
 ```{r table_high_gene}
 svs.gene %>% as.data.frame %>% mutate(chr=seqnames, pos=start) %>%
   filter(gene_type=='protein_coding',
-         freq<.01, impact %in% c('UTR', 'promoter')) %>%
+         impact %in% c('UTR', 'promoter')) %>%
   merge(pli.df, all.x=TRUE) %>%
   mutate(pLI=ifelse(is.na(pLI), -1, pLI)) %>% 
   merge(genes.list.s, all.x=TRUE) %>% 
   select(gene_list, gene, impact, pLI,
-         pos, type, size, large, qual, ac, freq,
+         pos, type, size, large, qual, ac, freq, hpgp,
          simp.rep, dgv, cons, cres,
          chr, end) %>%
-  arrange(is.na(gene_list), impact, desc(pLI), freq, desc(size)) %>%
+  arrange(is.na(gene_list), impact, desc(pLI), freq, hpgp, desc(size)) %>%
   formatTable() %>%
   datatable(filter='top', escape=FALSE, options=list(pageLength=25))
 ```
@@ -345,16 +345,16 @@ Recommended: filter out large SVs using column `large`.
 ```{r table_intronic}
 svs.gene %>% as.data.frame %>% mutate(chr=seqnames, pos=start) %>%
   filter(gene_type=='protein_coding',
-         freq<.01, impact == 'intronic') %>%
+         impact == 'intronic') %>%
   merge(pli.df, all.x=TRUE) %>%
   mutate(pLI=ifelse(is.na(pLI), -1, pLI)) %>% 
   merge(genes.list.s, all.x=TRUE) %>%
   filter(!is.na(gene_list) | cds.dist<1e3 | cons | cres) %>% 
   select(gene_list, gene, pLI, cds.dist,
-         pos, type, size, large, qual, ac, freq,
+         pos, type, size, large, qual, ac, freq, hpgp,
          simp.rep, dgv, cons, cres,
          chr, end) %>%
-  arrange(is.na(gene_list), cds.dist, desc(pLI), freq, desc(size)) %>%
+  arrange(is.na(gene_list), cds.dist, desc(pLI), freq, hpgp, desc(size)) %>%
   formatTable() %>%
   datatable(filter='top', escape=FALSE, options=list(pageLength=25))
 ```
@@ -369,12 +369,12 @@ Recommended: filter out large SVs using column `large`.
 
 ```{r table_rare_near_sel}
 svs.gr %>% as.data.frame %>% mutate(chr=seqnames, pos=start) %>%
-  filter(sel.gene.dist>0, sel.gene.dist<1e5, freq<.01) %>%
+  filter(sel.gene.dist>0, sel.gene.dist<1e5) %>%
   select(sel.gene.dist, sel.gene.near, 
-         pos, type, size, large, qual, ac, freq, genes,
+         pos, type, size, large, qual, ac, freq, hpgp, genes,
          simp.rep, dgv, cons, cres, ctcf,
          chr, end) %>%
-  arrange(sel.gene.dist, freq) %>%
+  arrange(sel.gene.dist, freq, hpgp) %>%
   formatTable() %>%
   datatable(filter='top', escape=FALSE, options=list(pageLength=25))
 ```
@@ -387,14 +387,14 @@ Recommended: filter out large SVs using column `large`.
 
 ```{r table_noncoding}
 svs.gr %>% as.data.frame %>% mutate(chr=seqnames, pos=start) %>%
-  filter(freq<.01, cres | cons | ctcf,
+  filter(cres | cons | ctcf,
          gene.dist>0) %>%
-  select(pos, type, size, large, qual, ac, freq, genes,
+  select(pos, type, size, large, qual, ac, freq, hpgp, genes,
          cons, cres, ctcf,
          gene.dist, gene.near,
          simp.rep, dgv, 
          chr, end) %>%
-  arrange(freq, gene.dist, !cons, !cres, desc(size)) %>%
+  arrange(freq, hpgp, gene.dist, !cons, !cres, desc(size)) %>%
   formatTable() %>%
   datatable(filter='top', escape=FALSE, options=list(pageLength=25))
 ```
@@ -411,8 +411,8 @@ Interesting profiles to look for:
 
 ```{r rarelarge}
 svs.gr %>% as.data.frame %>% mutate(chr=seqnames, pos=start) %>%
-  filter(size>1e3, freq<.01) %>%
-  select(pos, type, size, qual, ac, freq, 
+  filter(size>1e3) %>%
+  select(pos, type, size, qual, ac, freq, hpgp, 
          nb.pc.genes, genes,
          clinsv, cons, cres, ctcf,
          simp.rep, dgv, cov,
@@ -533,6 +533,7 @@ In most tables, we removed common variants, i.e. either:
 - `ac` allele count: `1` for het or `2` for hom.
 - `qual` the call quality. Corresponds to the read support (RE field in the Sniffles' VCF)
 - `freq` allele frequency of similar SV in gnomAD-SV (>10K genomes sequenced with Illumina whole-genome sequencing).
+- `hpgp` frequency in our 11 in-house nanopore controls.
 - `dgv` does the variant overlap any variant in DGV in any way?
 - `clinsv` any similar clinical SV variants (nstd102 in dbVar)? "Similar" defined as reciprocal overlap > 50%.
 - `ctcf` does the variant overlap a CTCF binding site? From ENCODE track for kidney.

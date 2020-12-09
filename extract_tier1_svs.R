@@ -32,17 +32,27 @@ svs.gr$giab = FALSE
 svs.gr$giab[ol.gr$queryHits] = TRUE
 
 message('Overlap with SVs from in-house  long-read studies...')
-ol.gr = svOverlap(svs.gr, hpgp, min.ol=.5, max.ins.dist=100)
-svs.gr$hpgp = FALSE
-svs.gr$hpgp[ol.gr$queryHits] = TRUE
+hpgp.nsamps = length(unique(hpgp$sample))
+ol.df = svOverlap(svs.gr, hpgp, min.ol=.5, max.ins.dist=100) %>%
+  as.data.frame %>%
+  mutate(sample=hpgp$sample[subjectHits]) %>%
+  group_by(queryHits) %>% summarize(freq=length(unique(sample))/hpgp.nsamps)
+svs.gr$hpgp = 0
+svs.gr$hpgp[ol.df$queryHits] = ol.df$freq
 
 message('Overlap with coding sequences...')
 svs.gr$cds.pc = overlapsAny(svs.gr, subset(genc, type=='CDS' & gene_type=='protein_coding'))
 
-
 message('Write output TSV...')
-svs.t1 = subset(svs.gr, cds.pc & freq<=.01 & !giab & !hpgp)
+## tier 1
+## either rare coding
+t1.bool = svs.gr$cds.pc & svs.gr$freq<=.01 & !svs.gr$giab & svs.gr$hpgp<=.01
+## or large CNVs AF<10%
+t1.bool = t1.bool | (svs.gr$cds.pc & svs.gr$freq<=.1 & svs.gr$hpgp<=.1 & svs.gr$size>1e5)
+## subset and write
+svs.t1 = svs.gr[which(t1.bool)]
 svs.t1 %>% as.data.frame %>% write.table(file=snakemake@output[["vcf_t1"]], sep='\t', row.names=FALSE, quote=FALSE)
 
-svs.other = subset(svs.gr, !cds.pc & freq<=.01 & !giab & !hpgp)
+## other rare SVs
+svs.other = svs.gr[which(!t1.bool & svs.gr$freq<=.01 & !svs.gr$giab & svs.gr$hpgp<=.01)]
 svs.other %>% as.data.frame %>% write.table(file=snakemake@output[["vcf_other"]], sep='\t', row.names=FALSE, quote=FALSE)

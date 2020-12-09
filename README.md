@@ -21,11 +21,18 @@ Once I've put the necessary annotation files somewhere (or made them inputs), it
 
 ## Running the pipeline
 
+Two modes depending on the input calls: single VCF or multiple VCFs (to be concatenated, e.g. one per chromosome).
 Within the associated Docker container (see [Dockerfile](Dockerfile)):
 
 ```sh
-snakemake --snakefile /scripts/Snakefile --config vcf=sniffles.vcf.gz bam=reads.bam bai=reads.bam.bai html=sv-report.html tsv=sv-annotated.tsv karyo_tsv=chr-arm-karyotype.tsv --cores 2
+## single-VCF input
+snakemake --snakefile /scripts/Snakefile --config vcf=sniffles.vcf.gz bam=reads.bam bai=reads.bam.bai ref=hg37.fa html=sv-report.html tsv=sv-annotated.tsv karyo_tsv=chr-arm-karyotype.tsv --cores 2
+
+## VCF list input
+snakemake --snakefile /scripts/Snakefile --config vcf_list=vcf.list.txt bam=reads.bam bai=reads.bam.bai ref=hg37.fa html=sv-report.html tsv=sv-annotated.tsv karyo_tsv=chr-arm-karyotype.tsv --cores 2
 ```
+
+It's also possible to force the sample name in the merged VCF using `sample=`.
 
 ## Inputs
 
@@ -47,6 +54,7 @@ In the HTML report and [TSV file with annotated SVs](examples/sv-annotated.tsv):
 - `ac` allele count: `1` for het or `2` for hom.
 - `qual` the call quality. Corresponds to the read support (RE field in the Sniffles' VCF)
 - `freq` allele frequency of similar SV in gnomAD-SV (>10K genomes sequenced with Illumina whole-genome sequencing).
+- `hpgp` frequency in our 11 in-house nanopore controls.
 - `dgv` does the variant overlap any variant in DGV in any way?
 - `clinsv` any similar clinical SV variants (nstd102 in dbVar)? "Similar" defined as reciprocal overlap > 50%.
 - `ctcf` does the variant overlap a CTCF binding site? From ENCODE track for kidney.
@@ -119,7 +127,7 @@ In most tables, we removed common variants, i.e. either:
 
 ### Tiers
 
-- Tier 1: Deletions + Insertions in Exons and aneuploidy. 
+- Tier 1: Deletions + Insertions in Exons; SVs >100kbp overlapping genes and with AF<10%; chr or chr-arm aberration (e.g. aneuploidy)
 - Tier 2: INS + DEL+ tandemDUP in genes (Introns + Exons).
 - Tier 3: Genome wide range. The genome wide scope of SV including rearrangements (Inversions, Translocations). These events will be hard to interpret but maybe useful to track over time. 
 
