@@ -100,9 +100,10 @@ formatTable <- function(df){
 ## 4: idxcov='indexcov_res/indexcov_res-indexcov.bed.gz'
 ## 5: sv_db='sv_annotation_database.RData'
 ## 6: gene_list: optional file with one gene per line ('NA' if not used)
-## 7: output csv
+## 7: output tsv with annotated SVs
+## 8: output tsv with karyotyping at chr-arm level
 args = commandArgs(TRUE)
-## args = c('svs_tier1.tsv', 'svs_tier1_finetuned.vcf', 'svs_other.tsv', 'indexcov_res/indexcov_res-indexcov.bed.gz', 'sv_annotation_database.RData', 'out.csv')
+## args = c('svs_tier1.tsv', 'svs_tier1_finetuned.vcf', 'svs_other.tsv', 'indexcov_res/indexcov_res-indexcov.bed.gz', 'sv_annotation_database.RData', 'out.tsv', 'out.karyo.tsv')
 
 message('Load SV calls...')
 svs.t1 = read.table(args[1], header=TRUE, as.is=TRUE, sep='\t')
@@ -450,6 +451,16 @@ out.tsv = svs.all %>% as.data.frame %>% unique %>%
 
 ## write TSV
 write.table(out.tsv, file=args[7], sep='\t', row.names=FALSE, quote=FALSE)
+
+## chr aberrations
+## define aberrant as deviating from expected (1) by at least 0.25
+## sex chr are marked as NA because they might deviate in males
+## chr with low-mappability are removed because "aberrant" for technical reasons
+cov.df %>% group_by(chr, arm) %>% summarize(median.cov=round(median(cov), 3)) %>%
+  mutate(aberrant=abs(1-median.cov)>.25, aberrant=ifelse(chr %in% c('X','Y','M'), NA, aberrant)) %>%
+  arrange(desc(abs(1-median.cov))) %>%
+  filter(!(paste(chr, arm) %in% paste(c(13:15, 21, 22), 'p'))) %>%
+  write.table(file=args[8], sep='\t', row.names=FALSE, quote=FALSE)
 ```
 
 ## Methods

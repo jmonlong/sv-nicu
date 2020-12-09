@@ -13,6 +13,8 @@ if 'html' not in config:
     config['html'] = 'sv-report.html'
 if 'tsv' not in config:
     config['tsv'] = 'sv-annotated.tsv'
+if 'karyo_tsv' not in config:
+    config['karyo_tsv'] = 'chr-arm-karyotype.tsv'
 
 GENE_LIST = 'NA'
 if 'gene_list' in config:
@@ -44,11 +46,12 @@ rule make_report:
         sv_db=config['db']
     output:
         html=config['html'],
-        tsv=config['tsv']
+        tsv=config['tsv'],
+        karyo=config['karyo_tsv']
     shell:
         """
         cp {input.rmd} report.Rmd
-        Rscript -e 'rmarkdown::render("report.Rmd", output_file="{output.html}")' {input.vcf_t1}  {input.vcf_t1_ft}  {input.vcf_other}  {input.idxcov}  {input.sv_db} {GENE_LIST} {output.tsv}
+        Rscript -e 'rmarkdown::render("report.Rmd", output_file="{output.html}")' {input.vcf_t1}  {input.vcf_t1_ft}  {input.vcf_other}  {input.idxcov}  {input.sv_db} {GENE_LIST} {output.tsv} {output.karyo}
         """
 
 ## extract tier 1 SVs to be finetuned or visualized

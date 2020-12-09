@@ -24,7 +24,7 @@ Once I've put the necessary annotation files somewhere (or made them inputs), it
 Within the associated Docker container (see [Dockerfile](Dockerfile)):
 
 ```sh
-snakemake --snakefile /scripts/Snakefile --config vcf=sniffles.vcf.gz bam=reads.bam bai=reads.bam.bai html=sv-report.html tsv=sv-annotated.tsv --cores 2
+snakemake --snakefile /scripts/Snakefile --config vcf=sniffles.vcf.gz bam=reads.bam bai=reads.bam.bai html=sv-report.html tsv=sv-annotated.tsv karyo_tsv=chr-arm-karyotype.tsv --cores 2
 ```
 
 ## Inputs
@@ -35,12 +35,12 @@ snakemake --snakefile /scripts/Snakefile --config vcf=sniffles.vcf.gz bam=reads.
 
 ## Outputs
 
-The pipeline creates two outputs that contain almost exactly the same information: a HTML report (`html=`) and a TSV file (`tsv=`).
-Both uses the following column names
-
+The pipeline creates three outputs that contain almost exactly the same information: a HTML report (`html=`) and two TSV files containing the annotated SVs (`tsv=`) and synthetic karyotype at chr-arm level (`karyo_tsv=`).
 Examples are available in the [*examples* folder](examples), e.g. the [HTML report](examples/sv-report.html).
 
 ### Column names
+
+In the HTML report and [TSV file with annotated SVs](examples/sv-annotated.tsv):
 
 - `pLI` prob of  loss-of-function intolerance described above (`-1` if no information available).
 - `type` SV type
@@ -62,11 +62,18 @@ Examples are available in the [*examples* folder](examples), e.g. the [HTML repo
 - `cov` median scaled coverage for large variants (>100 kbp), if *indexcov* results are available. Between parenthesis is the number of bin overlapping the variant (the higher the more confident).
 - `large` a boolean value flagging large SVs (>100 kbp). Because they often overlap hundreds of genes and are potentially false-positives, it is convenient to remove them from the table using this column. There is a tab specifically about large SVs that is more appropriate to investigate those.
 
-### TSV file
+In the [synthetic karyotype TSV file](examples/chr-arm-karyotype.tsv):
 
-In addition to the HTML report, a gene-centric TSV file is written with all the annotation described above.
+- `chr` and `arm` chromosome name and either *p*/*q* for the arm.
+- `median.cov` the median read coverage, normalized i.e. *1* means diploid.
+- `aberrant` a flag for chr-arm median coverage is closer to an aneuploid state (<0.75 or >1.25).
+
+
+### Annotated SV TSV file
+
+The TSV file with annotated SV is actually gene-centric and contains all the annotations described above.
 Gene-centric means that there is one row for each gene-variant pair.
-This helps filter on gene features (e.g. gene of interest, pLI).
+This helps filter on gene features (e.g. gene of interest, pLI) although large SVs spanning many genes are "duplicated" in the file.
 
 
 ## Methods
