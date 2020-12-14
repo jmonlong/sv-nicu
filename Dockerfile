@@ -103,6 +103,11 @@ RUN git clone https://github.com/ryanlayer/samplot.git && \
         cd samplot && \
         pip install .
 
+## mosdepth
+RUN wget --no-check-certificate https://github.com/brentp/mosdepth/releases/download/v0.3.1/mosdepth && \
+        chmod +x mosdepth && \
+        mv mosdepth /bin/
+
 ## IGV soon
 
 ## Add scripts

@@ -1,8 +1,7 @@
 ## config
 ## inputs:
 ## - 'vcf' VCF from Sniffles OR `vcf_list` text file with list of VCFs to concatenate
-## - 'bam' BAM header
-## - 'bai' BAM index
+## - 'bam_list' BAM list. TSV file with 1st column is chr name, 2nd column is path to BAM file
 ## - 'ref' reference FASTA
 ## output
 ## - 'html' HTML report
@@ -18,6 +17,16 @@ if 'karyo_tsv' not in config:
 SAMPLE = 'FAST0X'
 if 'sample' in config:
     SAMPLE = config['sample']
+
+## input BAM list: chr -> path
+BAMS = {}
+inf = open(config['bam_list'], 'r')
+for line in inf:
+    line = line.rstrip().split('\t')
+    BAMS[line[0]] = line[1]
+inf.close()
+def input_chr_bam(wildcards):
+    return BAMS[wildcards.chr]
 
 ## input VCF or VCF list
 VCF = ''
@@ -52,22 +61,25 @@ EXTRACT_TIER1_R = config['extract_tier1_r']
 EXTRACT_READS_PY = config['extract_reads_py']
 MERGE_CONTIGS_PY = config['merge_contigs_py']
 
+BIN=10000
+
 rule make_report:
     input:
         rmd=config['rmd'],
         vcf_t1='svs_tier1.tsv',
         vcf_t1_ft='svs_tier1_finetuned.vcf',
         vcf_other='svs_other.tsv',
-        idxcov='indexcov_res/indexcov_res-indexcov.bed.gz',
+        cov=expand('mosdepth.bin{bin}bp.regions.bed.gz', bin=BIN),
         sv_db=config['db']
     output:
         html=config['html'],
         tsv=config['tsv'],
         karyo=config['karyo_tsv']
+    benchmark: 'benchmark_sv_annotation/make_report.benchmark.tsv'
     shell:
         """
         cp {input.rmd} report.Rmd
-        Rscript -e 'rmarkdown::render("report.Rmd", output_file="{output.html}")' {input.vcf_t1}  {input.vcf_t1_ft}  {input.vcf_other}  {input.idxcov}  {input.sv_db} {GENE_LIST} {output.tsv} {output.karyo}
+        Rscript -e 'rmarkdown::render("report.Rmd", output_file="{output.html}")' {input.vcf_t1}  {input.vcf_t1_ft}  {input.vcf_other}  {input.cov}  {input.sv_db} {GENE_LIST} {output.tsv} {output.karyo}
         """
 
 rule rehead_vcf:
@@ -102,13 +114,24 @@ if 'amb' in config and not config['amb']:
         shell: 'touch {output}'
 else:
     ## extract reads supporting tier1 svs, to be used for assembly 
-    checkpoint extract_reads:
+    rule extract_reads_chr:
         input:
             svs='svs_tier1.tsv',
-            bam=config['bam'],
-            bai=config['bai']
+            bam=input_chr_bam,
+            cov=expand('mosdepth.bin{bin}bp.regions.bed.gz', bin=BIN)
+        output: "svs_tier1_reads_{chr}.tsv"
+        benchmark: 'benchmark_sv_annotation/extract_reads.{chr}.benchmark.tsv'
+        shell: "python3 {EXTRACT_READS_PY} -b {input.bam} -c {wildcards.chr} -v {input.svs} -o {output}"
+
+    checkpoint extract_reads:
+        input: expand('svs_tier1_reads_{chr}.tsv', chr=BAMS.keys())
         output: "svs_tier1_reads.tsv"
-        script: EXTRACT_READS_PY
+        benchmark: 'benchmark_sv_annotation/extract_reads.benchmark.tsv'
+        shell:
+            """
+            head -1 {input[0]} > {output}
+            cat {input} | grep -v 'start' >> {output}
+            """
 
     ## assemble reads supporting a SV
     rule asm_shasta:
@@ -117,6 +140,7 @@ else:
         threads: 2
         params:
             odir= '{svid}_shasta_out'
+        benchmark: 'benchmark_sv_annotation/asm_shasta.{svid}.benchmark.tsv'
         shell:
             """
             rm -rf {params.odir}
@@ -146,6 +170,7 @@ else:
             asm="all.fa",
             ref=config['ref']
         output: "all.sam"
+        benchmark: 'benchmark_sv_annotation/map_contigs.benchmark.tsv'
         shell: "minimap2 --paf-no-hit -a -x asm5 --cs -r2k -t 2 {input.ref} {input.asm} > {output}"
 
     ## sort aligned contigs
@@ -154,6 +179,7 @@ else:
         output:
             bam="{reads}.sorted.bam",
             bai="{reads}.sorted.bam.bai"
+        benchmark: 'benchmark_sv_annotation/sort_bam.{reads}.benchmark.tsv'
         shell:
             """
             samtools sort -o {output.bam} {input}
@@ -168,27 +194,31 @@ else:
             ref=config['ref']
         output: 'svs_tier1_finetuned.vcf'
         params: odir='svimasm_out'
+        benchmark: 'benchmark_sv_annotation/call_contigs.benchmark.tsv'
         shell:
             """
             svim-asm haploid {params.odir} {input.bam} {input.ref}
             cp {params.odir}/variants.vcf {output}
             """
 
-## quick read coverage track from the BAM index
-rule indexcov:
-    input:
-        bam=config['bam'],
-        bai=config['bai']
-    output: 'indexcov_res/indexcov_res-indexcov.bed.gz'
+rule mosdepth_chr:
+    input: input_chr_bam
+    output: 'mosdepth.{chr}.bin{bin}bp.regions.bed.gz'
     params:
-        dir='indexcov_res/',
-        bam='temp.bam',
-        bai='temp.bai'
+        prefix='mosdepth.{chr}/mosdepth.{chr}.bin{bin}bp',
+        out_dir='mosdepth.{chr}'
+    benchmark: 'benchmark_sv_annotation/mosdepth.{chr}.bin{bin}bp.benchmark.tsv'
     shell:
         """
-        rm -f {params.bam} {params.bai}
-        ln -s {input.bam} {params.bam}
-        ln -s {input.bai} {params.bai}
-        goleft indexcov --directory {params.dir} --sex X,Y {params.bam}
+        mkdir -p {params.out_dir}
+        mosdepth -b {wildcards.bin} -c {wildcards.chr} -n -x -m {params.prefix} {input}
+        cp {params.prefix}.regions.bed.gz {output}
         """
 
+rule merge_mosdepth:
+    input: expand('mosdepth.{chr}.bin{{bin}}bp.regions.bed.gz', chr=BAMS.keys())
+    output: 'mosdepth.bin{bin}bp.regions.bed.gz'
+    shell:
+        """
+        zcat {input} | gzip > {output}
+        """

@@ -97,7 +97,7 @@ formatTable <- function(df){
 ## 1: vcf_t1='svs_tier1.tsv'
 ## 2: vcf_t1_ft='svs_tier1_finetuned.vcf'
 ## 3: vcf_other='svs_other.vcf'
-## 4: idxcov='indexcov_res/indexcov_res-indexcov.bed.gz'
+## 4: coverage bed from mosdepth
 ## 5: sv_db='sv_annotation_database.RData'
 ## 6: gene_list: optional file with one gene per line ('NA' if not used)
 ## 7: output tsv with annotated SVs
@@ -208,9 +208,9 @@ svs.gr$cres = overlapsAny(svs.gr, cres)
 message('Overlap with conserved regions...')
 svs.gr$cons = overlapsAny(svs.gr, cons.gr)
 
-message('Read coverage stats from indexcov...')  
+message('Read coverage stats from mosdepth...')  
 svs.gr$cov = NA
-cov.df = read.table(args[4], as.is=TRUE, header=TRUE, sep='\t', comment='')
+cov.df = read.table(args[4], as.is=TRUE, sep='\t')
 colnames(cov.df) = c('chr', 'start', 'end', 'cov')
 chrs.order = c(1:22, 'X','Y','M')
 if(all(grepl('chr', unique(cov.df$chr)))){
@@ -218,16 +218,12 @@ if(all(grepl('chr', unique(cov.df$chr)))){
 }
 cov.df = cov.df %>% mutate(chr=factor(chr, levels=chrs.order))
 
-nb.bins = 10
-cov.10.df = cov.df %>%
+cov.all.df = cov.df %>%
   filter(chr!='chrM') %>% 
-  arrange(chr, start) %>%
-  group_by(chr) %>% mutate(bin=head(rep(1:(n()/nb.bins+1), each=nb.bins), n())) %>%
-  group_by(chr, bin) %>% summarize(start=min(start), end=max(end), cov=sum(cov)) %>%
-  ungroup %>% mutate(cov=cov/median(cov))
+  mutate(cov=cov/median(cov))
 
-cov.gr = makeGRangesFromDataFrame(cov.10.df, keep.extra.columns=TRUE)
-idx.large = which(svs.gr$size>1e5)
+cov.gr = makeGRangesFromDataFrame(cov.all.df, keep.extra.columns=TRUE)
+idx.large = which(svs.gr$size>1e4)
 ol.df = findOverlaps(svs.gr[idx.large], cov.gr) %>% as.data.frame %>%
   mutate(cov=cov.gr$cov[subjectHits]) %>%
   group_by(queryHits) %>% summarize(cov=paste0(round(median(cov), 2), ' (', n(), ')'))
@@ -247,7 +243,7 @@ svs.gene$impact = ol.genc$impact
 
 ### Chr. aberrations
 
-If `indexcov` was run: coverage estimates across the chromosomes to identify chromosomal aberrations 
+If `mosdepth` was run: coverage estimates across the chromosomes to identify chromosomal aberrations 
 
 Of note, some arms are not well assembled so it's normal to see low coverage in: 13p, 14p, 15p, 22p.
 Same for the the last chunk of chrYq and the beginning of 21p.
