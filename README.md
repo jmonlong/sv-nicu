@@ -116,7 +116,12 @@ The variants in each section are ordered to show those affecting genes with the 
 ### Genes of interest
 
 The report uses a few gene lists by default.
-To provide an additional list, format gene names into a file (one gene per line) and add `gene_list=FILE` to the `--config` options.
+To provide an additional list, format gene names into a file in either of the following formats:
+
+1. one gene per line. This list will be called "*custom*" in the output tsv/report
+2. a tab-separated file with one column for gene name and one column for list name (no headers).
+
+To use this gene list, add `gene_list=FILE` to the `--config` options.
 
 ### Filters
 
@@ -135,6 +140,15 @@ In most tables, we removed common variants, i.e. either:
 
 The known SV and other annotation tracks are prepared into one file using [prepare-sv-report-data.R](prepare-sv-report-data.R). 
 Note that this script requires SV calls on our 11 control genomes, not yet available in this repo.
+
+### Local re-assembly of tier 1 SVs
+
+Supporting reads identified by Sniffles are extracted and assembled using shasta. 
+The assembled sequenced is then aligned to the reference genome with minimap2 and the (potentially) fine-tuned SV identified using SVIM-asm.
+Is this re-assembled SV is similar to the original Sniffles call, it is used to update its breakpoint definition.
+
+This module is enabled by default.
+To disable it, add `amb=false` to the `--config` options.
 
 ## Recommendations for interpretation
 

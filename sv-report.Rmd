@@ -75,7 +75,7 @@ linkPos <- function(chr, start, end, flanks=500, format='html'){
 formatTable <- function(df){
   if(nrow(df)==0) return(df)
   ## make some columns "factors" to help filtering
-  for(coln in c('type', 'ac', 'method', 'dgv', 'meths')){
+  for(coln in c('type', 'ac', 'method', 'meths')){
     if(coln %in% colnames(df)){
       df[,coln] = factor(df[,coln])
     }
@@ -99,7 +99,7 @@ formatTable <- function(df){
 ## 3: vcf_other='svs_other.vcf'
 ## 4: coverage bed from mosdepth
 ## 5: sv_db='sv_annotation_database.RData'
-## 6: gene_list: optional file with one gene per line ('NA' if not used)
+## 6: gene_list: optional file with one gene per line or 2-columns tsv with gene-list ('NA' if not used)
 ## 7: output tsv with annotated SVs
 ## 8: output tsv with karyotyping at chr-arm level
 args = commandArgs(TRUE)
@@ -130,9 +130,13 @@ load(args[5])
 
 if(args[6] != 'NA'){
   message('Update gene lists...')
-  custom.gl = scan(args[6], '', quiet=TRUE)
-  gene.list = rbind(gene.list,
-                    tibble(gene_list='custom', gene=custom.gl))
+  custom.gl = read.table(args[6], header=FALSE, sep='\t', as.is=TRUE)
+  if(ncol(custom.gl) == 1){
+    custom.gl = tibble(gene_list='custom', gene=custom.gl[,1])
+  } else {
+    custom.gl = tibble(gene_list=custom.gl[,2], gene=custom.gl[,1])
+  }
+  gene.list = rbind(gene.list, custom.gl)
 }
 
 message('Gene annotation...')
@@ -171,11 +175,11 @@ svs.gr$cds.dist[d.df$queryHits] = d.df$distance
 
 message('Import genes of interest...')
 genes.list = gene.list %>%
-  mutate(gene_list=factor(gene_list)) %>% select(gene, gene_list) %>% unique
+  select(gene, gene_list) %>% unique
 genes.gr = subset(pc.genes, gene_name %in% genes.list$gene)
 
 genes.list.s = genes.list %>% group_by(gene) %>%
-  summarize(gene_list=factor(paste(gene_list, collapse='; ')))
+  summarize(gene_list=paste(gene_list, collapse='; '))
 
 d.df = distanceToNearest(svs.gr, genes.gr, ignore.strand=TRUE) %>% as.data.frame
 svs.gr$sel.gene.dist = NA

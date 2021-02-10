@@ -55,9 +55,10 @@ for line in inb:
                                       id=read.query_name, description=''))
     print('\t' + str(len(recs)) + ' reads extracted')
     # write fasta file with those reads
-    out_fa = line[svid_ii] + '.reads.fa'
-    SeqIO.write(recs, out_fa, "fasta")
-    outb.write('\t'.join(line[:3]) + '\t' + out_fa + '\n')
+    if len(recs) > 0:
+        out_fa = args.c + '_' + line[svid_ii] + '.reads.fa'
+        SeqIO.write(recs, out_fa, "fasta")
+        outb.write('\t'.join(line[:3]) + '\t' + out_fa + '\n')
 
 inb.close()
 outb.close()

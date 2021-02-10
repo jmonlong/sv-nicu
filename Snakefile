@@ -20,11 +20,12 @@ if 'sample' in config:
 
 ## input BAM list: chr -> path
 BAMS = {}
-inf = open(config['bam_list'], 'r')
-for line in inf:
-    line = line.rstrip().split('\t')
-    BAMS[line[0]] = line[1]
-inf.close()
+if 'bam_list' in config:
+    inf = open(config['bam_list'], 'r')
+    for line in inf:
+        line = line.rstrip().split('\t')
+        BAMS[line[0]] = line[1]
+    inf.close()
 def input_chr_bam(wildcards):
     return BAMS[wildcards.chr]
 
@@ -40,10 +41,20 @@ if VCF == '' and 'vcf_list' in config:
     inf.close()
     VCF = SAMPLE + '.sniffles.merged.vcf'
 
+if 'ref' not in config:
+    config['ref'] = 'ref.fa'
+
 ## additional gene list?
 GENE_LIST = 'NA'
 if 'gene_list' in config:
     GENE_LIST = config['gene_list']
+
+# should the tier1 SVs be re-assembled locally? (default is true)
+if 'amb' in config:
+    if type(config['amb']) == str:
+        config['amb'] = config['amb'] in ['T', 'true', 'True']
+else:
+    config['amb'] = True
 
 ## optional: scripts and database for annotation
 if 'rmd' not in config:
@@ -90,12 +101,17 @@ rule rehead_vcf:
         """
         echo {SAMPLE} > {params.temp}
         bcftools reheader -s {params.temp} {input} > {output}
+        rm {params.temp}
         """
 
 rule merge_vcfs:
     input: expand('{vcf}.rn.vcf', vcf=VCFS)
     output: VCF
-    shell: "bcftools concat {input} > {output}"
+    shell:
+        """
+        grep "#" {input[0]} > {output}
+        cat {input} | grep -v '#' >> {output}
+        """
 
 ## extract tier 1 SVs to be finetuned or visualized
 rule extract_tiers:
@@ -107,7 +123,7 @@ rule extract_tiers:
         vcf_other='svs_other.tsv'
     script: EXTRACT_TIER1_R
 
-if 'amb' in config and not config['amb']:
+if not config['amb']:
     rule skip_amb:
         input: 'svs_tier1.tsv'
         output: 'svs_tier1_finetuned.vcf'
@@ -117,8 +133,7 @@ else:
     rule extract_reads_chr:
         input:
             svs='svs_tier1.tsv',
-            bam=input_chr_bam,
-            cov=expand('mosdepth.bin{bin}bp.regions.bed.gz', bin=BIN)
+            bam=input_chr_bam
         output: "svs_tier1_reads_{chr}.tsv"
         benchmark: 'benchmark_sv_annotation/extract_reads.{chr}.benchmark.tsv'
         shell: "python3 {EXTRACT_READS_PY} -b {input.bam} -c {wildcards.chr} -v {input.svs} -o {output}"
@@ -127,11 +142,18 @@ else:
         input: expand('svs_tier1_reads_{chr}.tsv', chr=BAMS.keys())
         output: "svs_tier1_reads.tsv"
         benchmark: 'benchmark_sv_annotation/extract_reads.benchmark.tsv'
-        shell:
-            """
-            head -1 {input[0]} > {output}
-            cat {input} | grep -v 'start' >> {output}
-            """
+        run:
+            outf = open(output[0], 'w')
+            inf = open(input[0], 'r')
+            outf.write(next(inf))
+            inf.close()
+            for ff in input:
+                inf = open(ff, 'r')
+                header = next(inf)
+                for line in inf:
+                    outf.write(line)
+                inf.close()
+            outf.close()
 
     ## assemble reads supporting a SV
     rule asm_shasta:
@@ -222,3 +244,10 @@ rule merge_mosdepth:
         """
         zcat {input} | gzip > {output}
         """
+
+rule clean:
+    shell:
+        """
+        rm -rf mosdepth.*.bin*bp.regions.bed.gz all.fa all.sam all.sorted.bam all.sorted.bam.bai *.reads.fa *.contigs.fa *_shasta_out svs_tier1_reads_*.tsv *.rn.vcf
+        """
+    
