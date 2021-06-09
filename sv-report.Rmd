@@ -557,7 +557,6 @@ This helps filter on gene features (e.g. gene of interest, pLI).
 
 ### Tiers
 
-- Tier 1: Deletions + Insertions in Exons and aneuploidy. 
-- Tier 2: INS + DEL+ tandemDUP in genes (Introns + Exons).
+- Tier 1: Deletions + Insertions in Exons; SVs >100kbp overlapping genes and with AF<10%; chr or chr-arm aberration (e.g. aneuploidy)
+- Tier 2: INS + DEL + tandemDUP in genes or promoter (introns, UTR, promoter).
 - Tier 3: Genome wide range. The genome wide scope of SV including rearrangements (Inversions, Translocations). These events will be hard to interpret but maybe useful to track over time. 
-

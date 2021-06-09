@@ -26,18 +26,22 @@ Within the associated Docker container (see [Dockerfile](Dockerfile)):
 
 ```sh
 ## single-VCF input
-snakemake --snakefile /scripts/Snakefile --config vcf=sniffles.vcf.gz bam=reads.bam bai=reads.bam.bai ref=hg37.fa html=sv-report.html tsv=sv-annotated.tsv karyo_tsv=chr-arm-karyotype.tsv --cores 2
+snakemake --snakefile /scripts/Snakefile --config vcf=sniffles.vcf.gz bam=reads.bam ref=hg37.fa html=sv-report.html tsv=sv-annotated.tsv karyo_tsv=chr-arm-karyotype.tsv --cores 2
 
 ## VCF list input
-snakemake --snakefile /scripts/Snakefile --config vcf_list=vcf.list.txt bam=reads.bam bai=reads.bam.bai ref=hg37.fa html=sv-report.html tsv=sv-annotated.tsv karyo_tsv=chr-arm-karyotype.tsv --cores 2
+snakemake --snakefile /scripts/Snakefile --config vcf_list=vcf.list.txt bam=reads.bam ref=hg37.fa html=sv-report.html tsv=sv-annotated.tsv karyo_tsv=chr-arm-karyotype.tsv --cores 2
 ```
 
 It's also possible to force the sample name in the merged VCF using `sample=`.
 
 ## Inputs
 
-- Aligned reads, sorted and indexed (`bam=` and `bai=`)
-- SV calls from Sniffles in VCF (`vcf=`)
+- Aligned reads, sorted and indexed. Either:
+   - One BAM file (`bam=`)
+   - A TSV file with 2 columns (chromosome + path to BAM for this chromosome) (`bam_list=`)
+- SV calls from Sniffles in VCF. Either
+   - One VCF (`vcf=`)
+   - Multiple VCFs that will be merged (`vcf_list=`)
 - Reference file in indexed FASTA (`ref=`)
 
 ## Outputs
@@ -62,12 +66,12 @@ In the HTML report and [TSV file with annotated SVs](examples/sv-annotated.tsv):
 - `simp.rep` is the variant in or close to a simple repeat (see simple repeat track in the UCSC Genome Browser).
 - `cons` does the variant overlap a conserved element (as defined by 100 vertebrate phastCons track)
 - `impact` potential impact based on gene annotation: *coding*, *UTR*, *promoter*, *intronic*.
-- `genes`/`gene`/`gene_type` information about the gene(s) overlapped by the variant and their impact.
+- `genes`/`gene` information about the gene(s) overlapped by the variant and their impact.
 - `gene.dist` distance to the nearest gene which is specified by `gene.near`.
 - `sel.gene.dist` distance to the nearest gene of interest which is specified by `sel.gene.near`.
 - `cds.dist` distance to the nearest coding regions, useful for intronic variants for example.
 - `nb.pc.genes` number of protein-coding genes overlapped by the variant.
-- `cov` median scaled coverage for large variants (>100 kbp), if *indexcov* results are available. Between parenthesis is the number of bin overlapping the variant (the higher the more confident).
+- `cov` median scaled coverage for large variants (>100 kbp), if *mosdepth* results are available. Between parenthesis is the number of bin overlapping the variant (the higher the more confident).
 - `large` a boolean value flagging large SVs (>100 kbp). Because they often overlap hundreds of genes and are potentially false-positives, it is convenient to remove them from the table using this column. There is a tab specifically about large SVs that is more appropriate to investigate those.
 
 In the [synthetic karyotype TSV file](examples/chr-arm-karyotype.tsv):
@@ -89,7 +93,7 @@ This helps filter on gene features (e.g. gene of interest, pLI) although large S
 ### SV calling 
 
 The structural variants were called from the nanopore reads using [Sniffles](https://github.com/fritzsedlazeck/Sniffles).
-[indexcov](https://github.com/brentp/goleft/tree/master/indexcov) provides quick estimates of read coverage to confirm large CNVs or identify chromosomal aberrations. 
+[mosdepth](https://github.com/brentp/mosdepth) provides quick estimates of read coverage to confirm large CNVs or identify chromosomal aberrations. 
 
 To select for higher confidence SVs, increase the minimum quality (corresponding to the read support, RE in Sniffles' VCF). 
 In the tables, the `qual` column has been winsorized at 100 to help selecting the practical ranges.
@@ -133,7 +137,7 @@ In most tables, we removed common variants, i.e. either:
 ### Tiers
 
 - Tier 1: Deletions + Insertions in Exons; SVs >100kbp overlapping genes and with AF<10%; chr or chr-arm aberration (e.g. aneuploidy)
-- Tier 2: INS + DEL+ tandemDUP in genes (Introns + Exons).
+- Tier 2: INS + DEL + tandemDUP in genes or promoter (introns, UTR, promoter).
 - Tier 3: Genome wide range. The genome wide scope of SV including rearrangements (Inversions, Translocations). These events will be hard to interpret but maybe useful to track over time. 
 
 ### Database object
@@ -143,9 +147,9 @@ Note that this script requires SV calls on our 11 control genomes, not yet avail
 
 ### Local re-assembly of tier 1 SVs
 
-Supporting reads identified by Sniffles are extracted and assembled using shasta. 
-The assembled sequenced is then aligned to the reference genome with minimap2 and the (potentially) fine-tuned SV identified using SVIM-asm.
-Is this re-assembled SV is similar to the original Sniffles call, it is used to update its breakpoint definition.
+Supporting reads identified by Sniffles are extracted and assembled using [shasta](https://github.com/chanzuckerberg/shasta). 
+The assembled sequenced is then aligned to the reference genome with [minimap2](https://github.com/lh3/minimap2) and the (potentially) fine-tuned SV identified using [SVIM-asm](https://github.com/eldariont/svim-asm).
+If this re-assembled SV is similar to the original Sniffles call, it is used to update its breakpoint definition.
 
 This module is enabled by default.
 To disable it, add `amb=false` to the `--config` options.
